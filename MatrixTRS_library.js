@@ -13,7 +13,7 @@ Functions list (29):
     -forwardVectorFromMatrix
     -matrixDeterminant
     -matrixEigenvalues
-    -matrixEigenVector
+    -matrixEigenvector    TODO: FIX!!!
     -originToMatrix
     -anglesToMatrix
     -scaleToMatrix
@@ -38,41 +38,53 @@ Functions list (29):
  * @author Gariam
  */
 function isTRSMatrix(matrix){
-    if ("m" in matrix) matrix = new Float32Array(matrix.m);
-        else matrix = new Float32Array(matrix);
+    matrix = new Float32Array(angles.m || angles);
+    if (matrix.length != 16) return false; //check if it's a 4x4 matrix
+    if (matrix[3] != 0 || matrix[7] != 0 || matrix[11] != 0 || matrix[15] != 1) return false; //check if the last row is [0, 0, 0, 1]
 
-        if (matrix.length != 16) return false; //check if it's a 4x4 matrix
-        if (matrix[3] != 0 || matrix[7] != 0 || matrix[11] != 0 || matrix[15] != 1) return false; //check if the last row is [0, 0, 0, 1]
+    //remove scale component
+    const scale_x = new Vec3(matrix[0], matrix[1], matrix[2]).length();
+    const scale_y = new Vec3(matrix[4], matrix[5], matrix[6]).length();
+    const scale_z = new Vec3(matrix[8], matrix[9], matrix[10]).length();
+    matrix[0] /= scale_x;
+    matrix[1] /= scale_x;
+    matrix[2] /= scale_x;
+    matrix[4] /= scale_y;
+    matrix[5] /= scale_y;
+    matrix[6] /= scale_y;
+    matrix[8] /= scale_z;
+    matrix[9] /= scale_z;
+    matrix[10] /= scale_z;
 
-        //repeated operations
-        const a = matrix[5] * matrix[10] - matrix[6] * matrix[9];
-        const m410 = matrix[4] * matrix[10];
-        const m68 = matrix[6] * matrix[8];
-        const b = matrix[4] * matrix[9] - matrix[5] * matrix[8];
+    //repeated operations
+    const a = matrix[5] * matrix[10] - matrix[6] * matrix[9];
+    const m410 = matrix[4] * matrix[10];
+    const m68 = matrix[6] * matrix[8];
+    const b = matrix[4] * matrix[9] - matrix[5] * matrix[8];
 
-        //If the determinant of the submatrix from 00 to 22 is negative or 0 then the matrix is not valid
-        const determinant = matrix[0] * a - matrix[1] * (m410 - m68) + matrix[2] * b;
-        if (determinant <= 0 || isNaN(determinant) || determinant == undefined || determinant == null) return false;
+    //If the determinant of the submatrix from 00 to 22 is negative or 0 then the matrix is not valid
+    const determinant = matrix[0] * a - matrix[1] * (m410 - m68) + matrix[2] * b;
+    if (determinant <= 0 || !determinant) return false;
 
-        const transposed = Float32Array.of(matrix[0], matrix[4], matrix[8], matrix[1], matrix[5], matrix[9], matrix[2], matrix[6], matrix[10]);
+    const transposed = Float32Array.of(matrix[0], matrix[4], matrix[8], matrix[1], matrix[5], matrix[9], matrix[2], matrix[6], matrix[10]);
 
-        const adjugate = Float32Array.of(
-            a,
-            matrix[2] * matrix[9] - matrix[1] * matrix[10],
-            matrix[1] * matrix[6] - matrix[2] * matrix[5],
-            m68 - m410,
-            matrix[0] * matrix[10] - matrix[2] * matrix[8],
-            matrix[2] * matrix[4] - matrix[0] * matrix[6],
-            b,
-            matrix[1] * matrix[8] - matrix[0] * matrix[9],
-            matrix[0] * matrix[5] - matrix[1] * matrix[4]);
-        
-        //if the inverse of the submatrix from 00 to 22 is different from the same submatrix transposed then it's not valid
-        for (let i = 0; i < adjugate.length; i++){
-            const inverse = adjugate[i] / determinant;
-            if (inverse != transposed[i]) return false;
-        }
-        return true;
+    const adjugate = Float32Array.of(
+        a,
+        matrix[2] * matrix[9] - matrix[1] * matrix[10],
+        matrix[1] * matrix[6] - matrix[2] * matrix[5],
+        m68 - m410,
+        matrix[0] * matrix[10] - matrix[2] * matrix[8],
+        matrix[2] * matrix[4] - matrix[0] * matrix[6],
+        b,
+        matrix[1] * matrix[8] - matrix[0] * matrix[9],
+        matrix[0] * matrix[5] - matrix[1] * matrix[4]);
+
+    //if the inverse of the submatrix from 00 to 22 is different from the same submatrix transposed then it's not valid
+    for (let i = 0; i < adjugate.length; i++) {
+        const inverse = adjugate[i] / determinant;
+        if (Math.abs(inverse - transposed[i]) > 1e-6) return false;
+    }
+    return true;
 }
 
 /**
@@ -82,6 +94,9 @@ function isTRSMatrix(matrix){
  * @returns {Mat4} reflection matrix
  */
 function reflectionMatrix(normal, origin = new Vec3(0)){
+    normal = new Vec3(normal);
+    if (origin) origin = new Vec3(origin);
+
     //repeated operations
     const xy = normal.x * normal.y;
     const xz = normal.x * normal.z;
@@ -118,6 +133,9 @@ function reflectionMatrix(normal, origin = new Vec3(0)){
  * @returns {Mat4} projection matrix
  */
 function projectionMatrix(normal, origin = new Vec3(0)){
+    normal = new Vec3(normal);
+    if (origin) origin = new Vec3(origin);
+
     //repeated operations
     const xy = normal.x * normal.y;
     const xz = normal.x * normal.z;
@@ -144,7 +162,9 @@ function projectionMatrix(normal, origin = new Vec3(0)){
  */
 function transformsToMatrix(origin, angles, scale){
     const matrix = new Mat4();
-    angles = angles.multiply(0.0174533);
+    origin = new Vec3(origin);
+    angles = new Vec3(angles).multiply(0.0174533);
+    scale = new Vec3(scale);
     const sinAlpha = Math.sin(angles.x), cosAlpha = Math.cos(angles.x);
     const sinBeta = Math.sin(angles.y), cosBeta = Math.cos(angles.y);
     const sinGamma = Math.sin(angles.z), cosGamma = Math.cos(angles.z);
@@ -178,7 +198,7 @@ function transformsToMatrix(origin, angles, scale){
  * @author Gariam
  */
 function selectMatrixTransforms(matrix, origin, angles, scale){
-    if ("m" in matrix) matrix = matrix.m;
+    matrix = new Float64Array(matrix.m || matrix);
     let newScale, currentScale;
     const newMatrix = new Mat4();
     newMatrix.m = Array.from(matrix);
@@ -232,7 +252,7 @@ function selectMatrixTransforms(matrix, origin, angles, scale){
  * @author Gariam
  */
 function originFromMatrix(matrix){
-    if ("m" in matrix) matrix = matrix.m;
+    matrix = new Float64Array(matrix.m || matrix);
     return new Vec3(matrix[12], matrix[13], matrix[14]);
 }
 
@@ -243,7 +263,7 @@ function originFromMatrix(matrix){
  * @author Gariam
  */
 function anglesFromMatrix(matrix){
-    if ("m" in matrix) matrix = matrix.m;
+    matrix = new Float64Array(matrix.m || matrix);
     const right = new Vec3(matrix[0], matrix[1], matrix[2]).normalize();
     const up = new Vec3(matrix[4], matrix[5], matrix[6]).normalize();
     const forward = new Vec3(matrix[8], matrix[9], matrix[10]).normalize();
@@ -274,6 +294,7 @@ function anglesFromMatrix(matrix){
  * @author Gariam
  */
 function scaleFromMatrix(matrix){
+    matrix = new Float64Array(matrix.m || matrix);
     const x = new Vec3(matrix[0], matrix[1], matrix[2]).length();
     const y = new Vec3(matrix[4], matrix[5], matrix[6]).length();
     const z = new Vec3(matrix[8], matrix[9], matrix[10]).length();
@@ -287,7 +308,7 @@ function scaleFromMatrix(matrix){
  * @author Gariam
  */
 function rightVectorFromMatrix(matrix){
-    if ("m" in matrix) matrix = matrix.m;
+    matrix = new Float64Array(matrix.m || matrix);
     return new Vec3(matrix[0], matrix[1], matrix[2]).normalize();
 }
 
@@ -298,7 +319,7 @@ function rightVectorFromMatrix(matrix){
  * @author Gariam
  */
 function upVectorFromMatrix(matrix){
-    if ("m" in matrix) matrix = matrix.m;
+    matrix = new Float64Array(matrix.m || matrix);
     return new Vec3(matrix[4], matrix[5], matrix[6]).normalize();
 }
 
@@ -309,7 +330,7 @@ function upVectorFromMatrix(matrix){
  * @author Gariam
  */
 function forwardVectorFromMatrix(matrix){
-    if ("m" in matrix) matrix = matrix.m;
+    matrix = new Float64Array(matrix.m || matrix);
     return new Vec3(matrix[8], matrix[9], matrix[10]).normalize();
 }
 
@@ -319,7 +340,7 @@ function forwardVectorFromMatrix(matrix){
  * @returns {number} determinant
  */
 function matrixDeterminant(matrix){
-    if ("m" in matrix) matrix = matrix.m;
+    matrix = new Float64Array(matrix.m || matrix);
     //repeated operations
     const v29 = matrix[9] * matrix[2];
     const v213 = matrix[13] * matrix[2];
@@ -336,37 +357,48 @@ function matrixDeterminant(matrix){
  * @returns {number[]} eigenvalues
  */
 function matrixEigenvalues(matrix){
-    //repeated operation
-    const m510 = matrix[5] * matrix[10];
+    matrix = new Float64Array(matrix.m || matrix);
 
     //calculate the coefficients of the characteristic polynomial
-    const det = matrix[0] * (matrix[5] * matrix[10] - matrix[6] * matrix[9]) -
+    const c0 = matrix[0] * (matrix[5] * matrix[10] - matrix[6] * matrix[9]) -
                 matrix[1] * (matrix[4] * matrix[10] - matrix[6] * matrix[8]) +
                 matrix[2] * (matrix[4] * matrix[9] - matrix[5] * matrix[8]);
-    const c1 = matrix[0] * matrix[5] + matrix[0] * matrix[10] + m510 - matrix[6] * matrix[6] - matrix[2] * matrix[2] - matrix[1] * matrix[1];
-    const trace = -(matrix[0] + matrix[5] + matrix[10]);
+    const c1 = -(matrix[0] * matrix[5] + matrix[0] * matrix[10] + matrix[5] * matrix[10] - matrix[1] * matrix[4] - matrix[2] * matrix[8] - matrix[6] * matrix[9]);
+    const c2 = matrix[0] + matrix[5] + matrix[10];
 
     //solve the cubic equation
-    const p = trace / 3;
-    const q = p * p * p + (trace * c1 - det + det + det) / 6;
-    const r = c1 / 3;
+    const commonFactor = c2 / -3;
+    const q = (-3 * c1 - c2 * c2) / 9;
+    const r = (-9 * c2 * c1 - 27 * c0 - 2 * c1 * c1 * c1) / -54;
+    const q3 = q * q * q;
+    const disc = q3 + r * r;
 
-    const discriminant = (q + q + q) / (p + p) * Math.sqrt(-3 / p);
+    //find the roots (eigenvalues)
+    let lambda1, lambda2, lambda3;
+    if (disc == 0) {
+        const rRT = Math.cbrt(r);
+        lambda1 = rRT + rRT - commonFactor;
+        lambda2 = lambda3 = -(rRT + rRT) / 2 - commonFactor;
+    } else if (disc > 0) {
+        const discRT = Math.sqrt(disc);
+        const s = Math.cbrt(r + discRT);
+        const t = Math.cbrt(r - discRT);
+        lambda1 = s + t - commonFactor;
+        lambda2 = lambda3 = NaN; //complex numbers: -(s + t) / 2 - commonFactor ± i√3 / 2 * (s - t)
+    } else {
+        const theta = Math.acos(r / Math.sqrt(-q3));
+        const pi2 = Math.PI + Math.PI;
+        const qRT = Math.sqrt(-q) * 2;
+        lambda1 = qRT * Math.cos(theta / 3) - commonFactor;
+        lambda2 = qRT * Math.cos((theta + pi2) / 3) - commonFactor;
+        lambda3 = qRT * Math.cos((theta + pi2 + pi2) / 3) - commonFactor;
+    }
 
-    const acosDisc = Math.acos(discriminant);
-    if (isNaN(acosDisc)) return [null, null, null];
-    const sqrtP = Math.sqrt(-p);
-
-    //calculates the 3 eigenvalues
-    const pi2 = Math.PI + Math.PI;
-    const x1 = sqrtP * Math.cos(acosDisc / 3);
-    const x2 = sqrtP * Math.cos((acosDisc + pi2) / 3);
-    const x3 = sqrtP * Math.cos((acosDisc + pi2 + pi2) / 3);
-
-    return [x1 + x1 - r, x2 + x2 - r, x3 + x3 - r];
+    return [lambda1, lambda2, lambda3];
 }
 
 /**
+ * TODO: FIX!!!
  * Returns the eigenvector of the provided matrix corresponding to the provided eigenvalue.
  * 
  * If eigenvalue is null, this function also returns null, while if it's not provided, it defaults to 1.
@@ -418,14 +450,12 @@ function matrixEigenvector(eigenvalue = 1){
  */
 function originToMatrix(origin, matrix){
     const newMatrix = new Mat4();
-    if (matrix != undefined){
-        if ("m" in matrix) newMatrix.m = Array.from(matrix.m);
-        else newMatrix.m = Array.from(matrix);
+    newMatrix.m = Array.from(matrix.m || matrix || newMatrix.m);
 
-        newMatrix.m[12] = origin.x;
-        newMatrix.m[13] = origin.y;
-        newMatrix.m[14] = origin.z;
-    }
+    newMatrix.m[12] = origin.x;
+    newMatrix.m[13] = origin.y;
+    newMatrix.m[14] = origin.z;
+
     return newMatrix
 }
 
@@ -438,7 +468,7 @@ function originToMatrix(origin, matrix){
  * @author Gariam
  */
 function anglesToMatrix(angles, matrix){
-    angles = angles.multiply(0.0174533);
+    angles = new Vec3(angles).multiply(0.0174533);
     const sinAlpha = Math.sin(angles.x), cosAlpha = Math.cos(angles.x);
     const sinBeta = Math.sin(angles.y), cosBeta = Math.cos(angles.y);
     const sinGamma = Math.sin(angles.z), cosGamma = Math.cos(angles.z);
@@ -459,8 +489,8 @@ function anglesToMatrix(angles, matrix){
     const newMatrix = new Mat4();
     newMatrix.m = [m11, m12, m13, 0, m21, m22, m23, 0, m31, m32, m33, 0, 0, 0, 0, 1];
 
-    if (matrix != undefined){
-        if ("m" in matrix) matrix = matrix.m;
+    if (matrix){
+        matrix = new Float64Array(matrix.m || matrix);
         
         const rightLength = new Vec3(matrix[0], matrix[1], matrix[2]).length();
         const upLength = new Vec3(matrix[4], matrix[5], matrix[6]).length();
@@ -492,9 +522,8 @@ function anglesToMatrix(angles, matrix){
  */
 function scaleToMatrix(scale, matrix){
     const newMatrix = new Mat4();
-    if (matrix != undefined){
-        if ("m" in matrix) newMatrix.m = Array.from(matrix.m);
-        else newMatrix.m = Array.from(matrix);
+    if (matrix){
+        matrix = new Float64Array(matrix.m || matrix);
 
         const right = new Vec3(matrix[0], matrix[1], matrix[2]).normalize().multiply(scale.x);
         const up = new Vec3(matrix[4], matrix[5], matrix[6]).normalize().multiply(scale.y);
@@ -529,6 +558,9 @@ function scaleToMatrix(scale, matrix){
  */
 function viewVectorsToMatrix(right, up, forward, matrix){
     const newMatrix = new Mat4();
+    right = new Vec3(right);
+    up = new Vec3(up);
+    forward = new Vec3(forward);
     newMatrix.m[0] = right.x;
     newMatrix.m[1] = right.y;
     newMatrix.m[2] = right.z;
@@ -539,8 +571,8 @@ function viewVectorsToMatrix(right, up, forward, matrix){
     newMatrix.m[9] = forward.y;
     newMatrix.m[10] = forward.z;
 
-    if (matrix != undefined){
-        if ("m" in matrix) matrix = matrix.m;
+    if (matrix){
+        matrix = new Float64Array(matrix.m || matrix);
         
         const rightLength = new Vec3(matrix[0], matrix[1], matrix[2]).length();
         const upLength = new Vec3(matrix[4], matrix[5], matrix[6]).length();
@@ -560,30 +592,35 @@ function viewVectorsToMatrix(right, up, forward, matrix){
 }
 
 /**
- * Rotates the provaded matrix to make the forward vector point at a specific point in space and returns the resulting matrix.
- * @param {(MatrixTRS | Mat4 | number[])=} matrix - 4x4 transformation matrix
+ * Rotates the provided matrix to make the forward vector point at a specific point in space and returns the resulting matrix.
+ * @param {(MatrixTRS | Mat4 | number[])} matrix - 4x4 transformation matrix
  * @param {Vec3} point - point to look at
  * @param {Vec3} upVector - up vector
- * @returns {MatrixTRS} rotated matrix
+ * @returns {Mat4} rotated matrix
  */
 function matrixLookAt(matrix, point, upVector){
     const newMatrix = new Mat4();
-    if ("m" in matrix) newMatrix.m = Array.from(matrix.m);
-    else newMatrix.m = Array.from(matrix);
+    newMatrix.m = Array.from(matrix.m || matrix);
+    point = new Vec3(point);
+    upVector = new Vec3(upVector);
 
-    const forward = this.getOrigin().subtract(point).normalize();
+    const scale_x = new Vec3(newMatrix.m[0], newMatrix.m[1], newMatrix.m[2]).length();
+    const scale_y = new Vec3(newMatrix.m[4], newMatrix.m[5], newMatrix.m[6]).length();
+    const scale_z = new Vec3(newMatrix.m[8], newMatrix.m[9], newMatrix.m[10]).length();
+
+    const forward = new Vec3(newMatrix.m[12], newMatrix.m[13], newMatrix.m[14]).subtract(point).normalize();
     const right = upVector.cross(forward).normalize();
     const up = forward.cross(right);
 
-    newMatrix.m[0] = right.x;
-    newMatrix.m[1] = right.y;
-    newMatrix.m[2] = right.z;
-    newMatrix.m[4] = up.x;
-    newMatrix.m[5] = up.y;
-    newMatrix.m[6] = up.z;
-    newMatrix.m[8] = forward.x;
-    newMatrix.m[9] = forward.y;
-    newMatrix.m[10] = forward.z;
+    newMatrix.m[0] = right.x * scale_x;
+    newMatrix.m[1] = right.y * scale_x;
+    newMatrix.m[2] = right.z * scale_x;
+    newMatrix.m[4] = up.x * scale_y;
+    newMatrix.m[5] = up.y * scale_y;
+    newMatrix.m[6] = up.z * scale_y;
+    newMatrix.m[8] = forward.x * scale_z;
+    newMatrix.m[9] = forward.y * scale_z;
+    newMatrix.m[10] = forward.z * scale_z;
     
     return newMatrix;
 }
@@ -597,8 +634,9 @@ function matrixLookAt(matrix, point, upVector){
  */
 function translateMatrix(matrix, translation){
     const newMatrix = new Mat4();
-    if ("m" in matrix) matrix = matrix.m;
-    newMatrix.m = Array.from(matrix);
+    newMatrix.m = Array.from(matrix.m || matrix);
+    translation = new Vec3(translation);
+
     newMatrix.m[12] += translation.x;
     newMatrix.m[13] += translation.y;
     newMatrix.m[14] += translation.z;
@@ -614,14 +652,13 @@ function translateMatrix(matrix, translation){
  */
 function rotateMatrix(matrix, angles){
     const newMatrix = new Mat4();
-    if ("m" in matrix) matrix = matrix.m;
+    newMatrix.m = Array.from(matrix.m || matrix);
 
-    const rightLength = new Vec3(matrix[0], matrix[1], matrix[2]).length();
-    const upLength = new Vec3(matrix[4], matrix[5], matrix[6]).length();
-    const forwardLength = new Vec3(matrix[8], matrix[9], matrix[10]).length();
-    newMatrix.m = Array.from(matrix);
+    const scale_x = new Vec3(newMatrix.m[0], newMatrix.m[1], newMatrix.m[2]).length();
+    const scale_y = new Vec3(newMatrix.m[4], newMatrix.m[5], newMatrix.m[6]).length();
+    const scale_z = new Vec3(newMatrix.m[8], newMatrix.m[9], newMatrix.m[10]).length();
 
-    angles = angles.multiply(0.0174533);
+    angles = new Vec3(angles).multiply(0.0174533);
     const sinAlpha = Math.sin(angles.x), cosAlpha = Math.cos(angles.x);
     const sinBeta = Math.sin(angles.y), cosBeta = Math.cos(angles.y);
     const sinGamma = Math.sin(angles.z), cosGamma = Math.cos(angles.z);
@@ -629,15 +666,15 @@ function rotateMatrix(matrix, angles){
     const sinAlpha_sinBeta = sinAlpha * sinBeta;
     const cosAlpha_sinBeta = cosAlpha * sinBeta;
 
-    newMatrix.m[0] = cosGamma * cosBeta * rightLength;
-    newMatrix.m[1] = sinGamma * cosBeta * rightLength;
-    newMatrix.m[2] = -sinBeta * rightLength;
-    newMatrix.m[4] = (cosGamma * sinAlpha_sinBeta - sinGamma * cosAlpha) * upLength;
-    newMatrix.m[5] = (sinGamma * sinAlpha_sinBeta + cosGamma * cosAlpha) * upLength;
-    newMatrix.m[6] = cosBeta * sinAlpha * upLength;
-    newMatrix.m[8] = (cosGamma * cosAlpha_sinBeta + sinGamma * sinAlpha) * forwardLength;
-    newMatrix.m[9] = (sinGamma * cosAlpha_sinBeta - cosGamma * sinAlpha) * forwardLength;
-    newMatrix.m[10] = cosBeta * cosAlpha * forwardLength;
+    newMatrix.m[0] = cosGamma * cosBeta * scale_x;
+    newMatrix.m[1] = sinGamma * cosBeta * scale_x;
+    newMatrix.m[2] = -sinBeta * scale_x;
+    newMatrix.m[4] = (cosGamma * sinAlpha_sinBeta - sinGamma * cosAlpha) * scale_y;
+    newMatrix.m[5] = (sinGamma * sinAlpha_sinBeta + cosGamma * cosAlpha) * scale_y;
+    newMatrix.m[6] = cosBeta * sinAlpha * scale_y;
+    newMatrix.m[8] = (cosGamma * cosAlpha_sinBeta + sinGamma * sinAlpha) * scale_z;
+    newMatrix.m[9] = (sinGamma * cosAlpha_sinBeta - cosGamma * sinAlpha) * scale_z;
+    newMatrix.m[10] = cosBeta * cosAlpha * scale_z;
 
     return newMatrix;
 }
@@ -651,8 +688,9 @@ function rotateMatrix(matrix, angles){
  */
 function scaleMatrix(matrix, scale){
     const newMatrix = new Mat4();
-    if ("m" in matrix) matrix = matrix.m;
-    newMatrix.m = Array.from(matrix);
+    newMatrix.m = Array.from(matrix.m || matrix);
+    scale = new Vec3(scale);
+
     newMatrix.m[0] *= scale.x;
     newMatrix.m[1] *= scale.x;
     newMatrix.m[2] *= scale.x;
@@ -672,8 +710,9 @@ function scaleMatrix(matrix, scale){
  * @author Gariam
  */
 function inverseMatrix(matrix){
-    if ("m" in matrix) matrix = matrix.m;
-    let inverted = new Mat4();
+    matrix = new Float64Array(matrix.m || matrix);
+    const inverted = new Mat4();
+
     let right = new Vec3(matrix[0], matrix[1], matrix[2]);
     let up = new Vec3(matrix[4], matrix[5], matrix[6]);
     let forward = new Vec3(matrix[8], matrix[9], matrix[10]);
@@ -709,8 +748,7 @@ function inverseMatrix(matrix){
  */
 function negateMatrix(matrix){
     const newMatrix = new Mat4();
-    if ("m" in matrix) matrix = matrix.m;
-    newMatrix.m = Array.from(matrix, value => -value);
+    newMatrix.m = Array.from(matrix.m || matrix, value => -value);
     newMatrix.m[15] = 1
     return newMatrix;
 }
@@ -724,8 +762,9 @@ function negateMatrix(matrix){
  */
 function reflectMatrix(matrix, normal, origin = new Vec3(0)){
     const newMatrix = new Mat4();
-    if ("m" in matrix) matrix = new Float64Array(matrixA.m);
-    else matrix = new Float64Array(matrix);
+    matrix = new Float64Array(matrix.m || matrix);
+    normal = new Vec3(normal);
+    if (origin) origin = new Vec3(origin);
 
     function reflectionMatrix(normal, origin = new Vec3(0)){
         //repeated operations
@@ -792,8 +831,9 @@ function reflectMatrix(matrix, normal, origin = new Vec3(0)){
  */
 function projectMatrix(matrix, normal, origin = new Vec3(0)){
     const newMatrix = new Mat4();
-    if ("m" in matrix) matrix = new Float64Array(matrixA.m);
-    else matrix = new Float64Array(matrix);
+    matrix = new Float64Array(matrix.m || matrix);
+    normal = new Vec3(normal);
+    if (origin) origin = new Vec3(origin);
 
     function projectionMatrix(normal, origin){
         //repeated operations
@@ -845,8 +885,8 @@ function projectMatrix(matrix, normal, origin = new Vec3(0)){
  * @author Gariam
  */
 function matrixMultiply(matrixA, matrixB){
-    if ("m" in matrixA) matrixA = new Float64Array(matrixA.m);
-    if ("m" in matrixB) matrixB = new Float64Array(matrixB.m);
+    matrixA = new Float64Array(matrixA.m || matrixA);
+    matrixB = new Float64Array(matrixB.m || matrixB);
 
     const row0 = Float64Array.of(matrixB[0], matrixB[1], matrixB[2]);
     const row1 = Float64Array.of(matrixB[4], matrixB[5], matrixB[6]);
@@ -881,14 +921,12 @@ function matrixMultiply(matrixA, matrixB){
  * @author Gariam
  */
 function matrixVectorMultiply(matrix, vector){
-    if ("m" in matrix) matrix = new Float64Array(matrix.m);
-    else matrix = new Float64Array(matrix);
-    if (vector instanceof Vec2) vector = new Vec3(vector.x, vector.y, 0);
+    matrix = new Float64Array(matrix.m || matrix);
+    vector = new Vec3(vector);
     
     const x = vector.x * matrix[0] + vector.y * matrix[4] + vector.z * matrix[8] + matrix[12];
     const y = vector.x * matrix[1] + vector.y * matrix[5] + vector.z * matrix[9] + matrix[13];
     const z = vector.x * matrix[2] + vector.y * matrix[6] + vector.z * matrix[10] + matrix[14];
-
     return new Vec3(x, y, z);
 }
 
@@ -903,12 +941,10 @@ function matrixVectorMultiply(matrix, vector){
  * @author Gariam
  */
 function slerpMatrix(matrixA, matrixB, value, valueRot, valueScl){
-    if ("m" in matrixA) matrixA = new Float64Array(matrixA.m);
-    else matrixA = new Float64Array(matrixA);
-    if ("m" in matrixB) matrixB = new Float64Array(matrixB.m);
-    else matrixB = new Float64Array(matrixB);
-    if (valueRot == undefined) valueRot = value;
-    if (valueScl == undefined) valueScl = value;
+    matrixA = new Float64Array(matrixA.m || matrixA);
+    matrixB = new Float64Array(matrixB.m || matrixB);
+    valueRot = valueRot || value;
+    valueScl = valueScl || value;
 
     const newMatrix = new Mat4();
     if (value == 0 && valueRot == 0 && valueScl == 0) {
@@ -1007,18 +1043,34 @@ function slerpMatrix(matrixA, matrixB, value, valueRot, valueScl){
     }
     
     //interpolate origin
-    const origin = mixVec3(new Vec3(matrixA[12], matrixA[13], matrixA[14]), new Vec3(matrixB[12], matrixB[13], matrixB[14]), value);
-
-    //interpolate angles
-    const q1 = matrixToQuaternion(matrixA);
-    const q2 = matrixToQuaternion(matrixB);
-    const quaternion = slerpQuaternion(q1, q2, valueRot);
-    newMatrix.m = quaternionToMatrix(quaternion);
+    let origin;
+    switch (value) {
+        case 0: origin = new Vec3(matrixA[12], matrixA[13], matrixA[14]);
+        case 1: origin = new Vec3(matrixB[12], matrixB[13], matrixB[14]);
+        default: origin = mixVec3(new Vec3(matrixA[12], matrixA[13], matrixA[14]), new Vec3(matrixB[12], matrixB[13], matrixB[14]), value);
+    }
 
     //interpolate scale
-    const scaleA = matrixToScale(matrixA);
-    const scaleB = matrixToScale(matrixB);
-    const scale = mixVec3(scaleA, scaleB, valueScl);
+    let scale, scaleA, scaleB;
+    switch (valueScl) {
+        case 0: scale = scaleA = matrixToScale(matrixA); break;
+        case 1: scale = scaleB = matrixToScale(matrixB); break;
+        default:
+            scaleA = matrixToScale(matrixA);
+            scaleB = matrixToScale(matrixB);
+            scale = mixVec3(scaleA, scaleB, valueScl);
+    }
+
+    //interpolate angles
+    switch (valueRot) {
+        case 0: newMatrix.m = new Float64Array(matrixA[0] / scaleA.x, matrixA[1] / scaleA.x, matrixA[2] / scaleA.x, 0, matrixA[4] / scaleA.y, matrixA[5] / scaleA.y, matrixA[6] / scaleA.y, 0, matrixA[8] / scaleA.z, matrixA[9] / scaleA.z, matrixA[10] / scaleA.z, 0, 0, 0, 0, 1); break;
+        case 1: newMatrix.m = new Float64Array(matrixB[0] / scaleB.x, matrixB[1] / scaleB.x, matrixB[2] / scaleB.x, 0, matrixB[4] / scaleB.y, matrixB[5] / scaleB.y, matrixB[6] / scaleB.y, 0, matrixB[8] / scaleB.z, matrixB[9] / scaleB.z, matrixB[10] / scaleB.z, 0, 0, 0, 0, 1); break;
+        default:
+            const q1 = matrixToQuaternion(matrixA);
+            const q2 = matrixToQuaternion(matrixB);
+            const quaternion = slerpQuaternion(q1, q2, valueRot);
+            newMatrix.m = quaternionToMatrix(quaternion);
+    }
 
     newMatrix.m[0] *= scale.x;
     newMatrix.m[1] *= scale.x;
