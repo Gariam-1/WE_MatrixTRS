@@ -1022,14 +1022,14 @@ class MatrixTRS{
             angles.z = Math.atan2(right.y, right.x);
         } else {
             if (right.z > 0){
-                angles.x = 1.5707963268;
-                angles.y = Math.atan2(right.x, up.x);
-                angles.z = 0;
-            } else {
-                angles.x = -1.5707963268;
-                angles.y = -Math.atan2(right.x, up.x);
-                angles.z = 0;
-            }
+	        angles.x = 0;
+	        angles.y = -1.5707963268;
+	        angles.z = -Math.atan2(forward.y, up.y);
+	    } else {
+	        angles.x = 0;
+	        angles.y = 1.5707963268;
+	        angles.z = -Math.atan2(up.x, forward.x);
+	    }
         }
         return angles;
     }
