@@ -880,16 +880,16 @@ class MatrixTRS{
 
         if (multiplier.hasOwnProperty("x")) return vectorMultiply(this.m, multiplier);
         else {
-            matrix = new Float64Array(multiplier.m || multiplier);
+            newMatrix = new Float64Array(multiplier.m || multiplier);
 
-            const row0 = new Vec3(matrix[0], matrix[1], matrix[2]);
-            const row1 = new Vec3(matrix[4], matrix[5], matrix[6]);
-            const row2 = new Vec3(matrix[8], matrix[9], matrix[10]);
+            const row0 = new Vec3(newMatrix[0], newMatrix[1], newMatrix[2]);
+            const row1 = new Vec3(newMatrix[4], newMatrix[5], newMatrix[6]);
+            const row2 = new Vec3(newMatrix[8], newMatrix[9], newMatrix[10]);
 
             const column0 = vectorMultiply(this.m, row0);
             const column1 = vectorMultiply(this.m, row1);
             const column2 = vectorMultiply(this.m, row2);
-            const column3 = new Vec3(this.m[12] + matrix[12], this.m[13] + matrix[13], this.m[14] + matrix[14]);
+            const column3 = new Vec3(this.m[12] + newMatrix[12], this.m[13] + newMatrix[13], this.m[14] + newMatrix[14]);
         
             newMatrix = Float64Array.of(
                 column0.x, column0.y, column0.z, 0,
@@ -1114,3 +1114,4 @@ class MatrixTRS{
                 q1[3] * w1 + q2[3] * w2);
     }
 }
+
